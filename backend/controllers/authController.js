@@ -1,47 +1,105 @@
-const pool = require('../models/db');
 
-// Registro exclusivo para Clientes
+const pool = require('../models/db');
+const bcrypt = require('bcryptjs');
+
+// Registro exclusivo para clientes
 exports.registrarCliente = async (req, res) => {
     try {
         const { nombre, cedula, correo, contrasena, direccion } = req.body;
 
         if (!nombre || !cedula || !correo || !contrasena) {
-            return res.status(400).json({ error: 'Todos los campos obligatorios deben estar completos.' });
+            return res.status(400).json({
+                error: 'Todos los campos obligatorios deben estar completos.'
+            });
         }
 
-        // Verificar si el correo o la cédula ya existen
-        const [existing] = await pool.query('SELECT * FROM usuarios WHERE correo = ? OR cedula = ?', [correo, cedula]);
-        if (existing.length > 0) {
-            return res.status(400).json({ error: 'El correo electrónico o la cédula ya se encuentran registrados.' });
-        }
+        const correoNormalizado = correo.trim().toLowerCase();
 
-        const rol = 'Cliente';
-        const [result] = await pool.query(
-            'INSERT INTO usuarios (nombre, cedula, correo, contrasena, rol, direccion) VALUES (?, ?, ?, ?, ?, ?)',
-            [nombre, cedula, correo, contrasena, rol, direccion || 'Bogotá']
+        // Comprobar si el usuario ya existe
+        const [existing] = await pool.query(
+            'SELECT idUsuario FROM usuarios WHERE correo = ? OR cedula = ?',
+            [correoNormalizado, cedula]
         );
 
-        res.status(201).json({ 
+        if (existing.length > 0) {
+            return res.status(409).json({
+                error: 'El correo o la cédula ya están registrados.'
+            });
+        }
+
+        // Proteger la contraseña
+        const contrasenaHash = await bcrypt.hash(contrasena, 12);
+
+        const [result] = await pool.query(
+            `INSERT INTO usuarios
+             (nombre, cedula, correo, contrasena, rol, direccion)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+                nombre,
+                cedula,
+                correoNormalizado,
+                contrasenaHash,
+                'Cliente',
+                direccion || 'Bogotá'
+            ]
+        );
+
+        return res.status(201).json({
             message: 'Registro exitoso. ¡Ya puedes iniciar sesión!',
-            idUsuario: result.insertId 
+            idUsuario: result.insertId
         });
+
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error en registro:', error);
+
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({
+                error: 'El correo o la cédula ya están registrados.'
+            });
+        }
+
+        return res.status(500).json({
+            error: 'No fue posible completar el registro.'
+        });
     }
 };
 
-// Login general para Admin, Vendedor y Clientes registrados
+// Inicio de sesión para todos los roles
 exports.login = async (req, res) => {
     try {
         const { correo, contrasena } = req.body;
-        const [rows] = await pool.query('SELECT * FROM usuarios WHERE correo = ? AND contrasena = ?', [correo, contrasena]);
+
+        if (!correo || !contrasena) {
+            return res.status(400).json({
+                error: 'Debes ingresar correo y contraseña.'
+            });
+        }
+
+        const [rows] = await pool.query(
+            'SELECT * FROM usuarios WHERE correo = ?',
+            [correo.trim().toLowerCase()]
+        );
 
         if (rows.length === 0) {
-            return res.status(401).json({ error: 'Correo o contraseña incorrectos.' });
+            return res.status(401).json({
+                error: 'Correo o contraseña incorrectos.'
+            });
         }
 
         const usuario = rows[0];
-        res.json({
+
+        const contrasenaValida = await bcrypt.compare(
+            contrasena,
+            usuario.contrasena
+        );
+
+        if (!contrasenaValida) {
+            return res.status(401).json({
+                error: 'Correo o contraseña incorrectos.'
+            });
+        }
+
+        return res.json({
             message: 'Autenticación exitosa',
             usuario: {
                 idUsuario: usuario.idUsuario,
@@ -51,7 +109,12 @@ exports.login = async (req, res) => {
                 rol: usuario.rol
             }
         });
+
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error en login:', error);
+
+        return res.status(500).json({
+            error: 'Error interno al iniciar sesión.'
+        });
     }
 };
