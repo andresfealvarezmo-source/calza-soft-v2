@@ -1,5 +1,4 @@
-CREATE DATABASE IF NOT EXISTS calza_soft_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE calza_soft_db;
+USE defaultdb;
 
 CREATE TABLE IF NOT EXISTS usuarios (
     idUsuario INT AUTO_INCREMENT PRIMARY KEY,
