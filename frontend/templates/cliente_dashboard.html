@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Portal Cliente - Carrito de Compras | Calza Soft</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .navbar {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            list-style: none;
+            align-items: center;
+        }
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover {
+            color: var(--secondary-color);
+        }
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+        @media (max-width: 900px) {
+            .layout-grid { grid-template-columns: 1fr; }
+        }
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .badge-mayorista {
+            background-color: var(--accent-color);
+            color: #1e293b;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Calza Soft - Tienda Online</h1>
+        <ul class="nav-links">
+            <li><a href="#" onclick="mostrarSeccion('catalogo')">Catálogo & Carrito</a></li>
+            <li><a href="#" onclick="mostrarSeccion('puntos')">Puntos de Venta (RF05)</a></li>
+            <li><span id="nombreUsuarioLog" style="font-weight: 600; color: #38bdf8;"></span></li>
+            <li><button class="btn" style="background-color: var(--danger-color); padding: 0.4rem 0.8rem;" onclick="localStorage.clear(); window.location.href='/login.html';">Cerrar Sesión</button></li>
+        </ul>
+    </nav>
+
+    <div class="container" id="seccionCatalogo">
+        <h2>Catálogo de Calzado y Precios (RF02)</h2>
+        <p style="color: #64748b; margin-bottom: 1.5rem;">Elige tu talla (36 a 44). <strong>¡A partir de 10 pares el precio cambia automáticamente al por mayor!</strong></p>
+        
+        <div class="layout-grid">
+            <div>
+                <table id="tablaCatalogoCliente">
+                    <thead>
+                        <tr>
+                            <th>Imagen</th>
+                            <th>Referencia</th>
+                            <th>Nombre</th>
+                            <th>Talla</th>
+                            <th>P. Detal / Mayor</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>🛒 Tu Carrito de Compras</h3>
+                <div id="carritoItems" style="margin-top: 1rem; min-height: 150px; max-height: 300px; overflow-y: auto;">
+                    <p style="color: #64748b; text-align: center; margin-top: 2rem;">El carrito está vacío.</p>
+                </div>
+                <hr style="margin: 1rem 0;">
+                <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: bold;">
+                    <span>Total a Pagar:</span>
+                    <span id="totalCarrito">$0.00</span>
+                </div>
+                <button class="btn" style="width: 100%; margin-top: 1.5rem; background-color: var(--success-color);" onclick="procesarCompra()">Confirmar y Finalizar Compra</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="seccionPuntos" style="display: none;">
+        <h2>Puntos de Venta Físicos Cercanos (RF05)</h2>
+        <div class="card" style="margin-top: 1.5rem;">
+            <ul id="listaPuntosCliente" style="list-style: none;"></ul>
+        </div>
+    </div>
+
+    <!-- MODAL DE CHECKOUT / PAGO REALISTA -->
+    <div id="modalPago" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
+        <div class="card" style="width: 100%; max-width: 450px; background: white; padding: 2rem;">
+            <h3>💳 Finalizar Datos de Envío y Pago</h3>
+            <form id="formCheckout" style="margin-top: 1rem;">
+                <div style="margin-bottom: 0.8rem;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 0.3rem;">Número de Cédula:</label>
+                    <input type="text" id="checkoutCedula" required style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 0.8rem;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 0.3rem;">Dirección de la Casa:</label>
+                    <input type="text" id="checkoutDireccion" required style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 0.8rem;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 0.3rem;">Método de Pago:</label>
+                    <select id="checkoutMetodo" onchange="toggleTarjeta()" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                        <option value="Efectivo">Efectivo contra entrega</option>
+                        <option value="Tarjeta">Tarjeta de Crédito / Débito</option>
+                    </select>
+                </div>
+
+                <!-- SECCIÓN TARJETA -->
+                <div id="seccionTarjeta" style="display: none; background: #f8fafc; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; border: 1px solid #e2e8f0;">
+                    <div style="margin-bottom: 0.6rem;">
+                        <label style="font-size: 0.85rem;">Número de Tarjeta:</label>
+                        <input type="text" id="numTarjeta" placeholder="0000 0000 0000 0000" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                        <div>
+                            <label style="font-size: 0.85rem;">Expiración (MM/AA):</label>
+                            <input type="text" id="expTarjeta" placeholder="MM/AA" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85rem;">CVV:</label>
+                            <input type="password" id="cvvTarjeta" placeholder="123" maxlength="4" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn" style="background-color: #64748b; flex: 1;" onclick="cerrarModalPago()">Cancelar</button>
+                    <button type="submit" class="btn" style="background-color: var(--success-color); flex: 1;">Pagar y Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let carrito = [];
+        let productosDisponibles = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const usuario = JSON.parse(localStorage.getItem('usuario'));
+            if (usuario) {
+                document.getElementById('nombreUsuarioLog').textContent = `${usuario.nombre} (${usuario.rol})`;
+                // Rellenar automáticamente la cédula si el usuario la tiene guardada
+                if (usuario.cedula) {
+                    document.getElementById('checkoutCedula').value = usuario.cedula;
+                }
+            }
+            cargarCatalogo();
+            cargarPuntosVenta();
+        });
+
+        function mostrarSeccion(seccion) {
+            if (seccion === 'catalogo') {
+                document.getElementById('seccionCatalogo').style.display = 'block';
+                document.getElementById('seccionPuntos').style.display = 'none';
+            } else {
+                document.getElementById('seccionCatalogo').style.display = 'none';
+                document.getElementById('seccionPuntos').style.display = 'block';
+            }
+        }
+
+        async function cargarCatalogo() {
+            try {
+                const res = await fetch('/api/productos');
+                productosDisponibles = await res.json();
+                const tbody = document.querySelector('#tablaCatalogoCliente tbody');
+                tbody.innerHTML = '';
+
+                productosDisponibles.forEach(p => {
+                    let tallasOptions = '';
+                    for (let t = 36; t <= 44; t++) {
+                        let selected = (p.talla == t) ? 'selected' : '';
+                        tallasOptions += `<option value="${t}" ${selected}>Talla ${t}</option>`;
+                    }
+
+                    const imgUrl = p.imagen ? p.imagen : '/static/img/no-image.svg';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><img src="${imgUrl}" alt="Zapato" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" onerror="this.src='/static/img/no-image.svg'"></td>
+                        <td><strong>${p.referencia}</strong></td>
+                        <td>${p.nombre}</td>
+                        <td>
+                            <select id="talla-${p.idProducto}" style="padding: 0.3rem; border-radius: 4px; border: 1px solid #cbd5e1;">
+                                ${tallasOptions}
+                            </select>
+                        </td>
+                        <td>
+                            Detal: $${p.precioMenor.toLocaleString()}<br>
+                            <small style="color: #64748b;">Mayor (≥10u): $${p.precioMayor.toLocaleString()}</small>
+                        </td>
+                        <td>
+                            ${p.cantidad > 0 ? `<button class="btn" style="padding: 0.3rem 0.6rem; font-size: 0.85rem;" onclick="agregarAlCarrito(${p.idProducto})">Agregar</button>` : '<span class="badge-agotado">Agotado</span>'}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function cargarPuntosVenta() {
+            try {
+                const res = await fetch('/api/puntos-venta');
+                const puntos = await res.json();
+                const lista = document.getElementById('listaPuntosCliente');
+                lista.innerHTML = '';
+                puntos.forEach(pt => {
+                    const li = document.createElement('li');
+                    li.style.marginBottom = '1rem';
+                    li.style.paddingBottom = '0.5rem';
+                    li.style.borderBottom = '1px solid #e2e8f0';
+                    li.innerHTML = `📍 <strong>${pt.nombre}</strong><br><span style="color:#64748b;">Dirección: ${pt.direccion} (${pt.ubicacion})</span>`;
+                    lista.appendChild(li);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function agregarAlCarrito(idProducto) {
+            const producto = productosDisponibles.find(p => p.idProducto === idProducto);
+            if (!producto) return;
+
+            const selectTalla = document.getElementById(`talla-${idProducto}`);
+            const tallaSeleccionada = selectTalla.value;
+
+            const itemExistente = carrito.find(item => item.idProducto === idProducto && item.talla === tallaSeleccionada);
+            
+            if (itemExistente) {
+                itemExistente.cantidad++;
+            } else {
+                carrito.push({
+                    idProducto: producto.idProducto,
+                    nombre: `${producto.nombre}`,
+                    talla: tallaSeleccionada,
+                    precioDetal: producto.precioMenor,
+                    precioMayor: producto.precioMayor,
+                    precioUnitario: producto.precioMenor,
+                    cantidad: 1,
+                    esMayorista: false
+                });
+            }
+            renderizarCarrito();
+        }
+
+        function renderizarCarrito() {
+            const contenedor = document.getElementById('carritoItems');
+            const totalSpan = document.getElementById('totalCarrito');
+            
+            if (carrito.length === 0) {
+                contenedor.innerHTML = '<p style="color: #64748b; text-align: center; margin-top: 2rem;">El carrito está vacío.</p>';
+                totalSpan.textContent = '$0.00';
+                return;
+            }
+
+            contenedor.innerHTML = '';
+            let total = 0;
+
+            carrito.forEach((item, index) => {
+                if (item.cantidad >= 10) {
+                    item.precioUnitario = item.precioMayor;
+                    item.esMayorista = true;
+                } else {
+                    item.precioUnitario = item.precioDetal;
+                    item.esMayorista = false;
+                }
+
+                const subtotal = item.cantidad * item.precioUnitario;
+                total += subtotal;
+
+                const div = document.createElement('div');
+                div.className = 'cart-item';
+                div.innerHTML = `
+                    <div>
+                        <strong style="font-size:0.9rem;">${item.nombre} (Talla: ${item.talla})</strong><br>
+                        <small>$${item.precioUnitario.toLocaleString()} x ${item.cantidad}</small>
+                        ${item.esMayorista ? '<br><span class="badge-mayorista">Precio Mayorista Aplicado</span>' : ''}
+                    </div>
+                    <div>
+                        <button class="btn" style="padding: 2px 6px; background-color: var(--danger-color);" onclick="cambiarCantidad(${index}, -1)">-</button>
+                        <span style="margin: 0 5px;">${item.cantidad}</span>
+                        <button class="btn" style="padding: 2px 6px;" onclick="cambiarCantidad(${index}, 1)">+</button>
+                    </div>
+                `;
+                contenedor.appendChild(div);
+            });
+
+            totalSpan.textContent = `$${total.toLocaleString()}`;
+        }
+
+        function cambiarCantidad(index, delta) {
+            carrito[index].cantidad += delta;
+            if (carrito[index].cantidad <= 0) {
+                carrito.splice(index, 1);
+            }
+            renderizarCarrito();
+        }
+
+        function procesarCompra() {
+            if (carrito.length === 0) {
+                alert('El carrito está vacío.');
+                return;
+            }
+            document.getElementById('modalPago').style.display = 'flex';
+        }
+
+        function cerrarModalPago() {
+            document.getElementById('modalPago').style.display = 'none';
+        }
+
+        function toggleTarjeta() {
+            const metodo = document.getElementById('checkoutMetodo').value;
+            const seccion = document.getElementById('seccionTarjeta');
+            if (metodo === 'Tarjeta') {
+                seccion.style.display = 'block';
+            } else {
+                seccion.style.display = 'none';
+            }
+        }
+
+        document.getElementById('formCheckout').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const cedula = document.getElementById('checkoutCedula').value;
+            const direccion = document.getElementById('checkoutDireccion').value;
+            const metodo = document.getElementById('checkoutMetodo').value;
+
+            if (metodo === 'Tarjeta') {
+                const tarjeta = document.getElementById('numTarjeta').value;
+                const exp = document.getElementById('expTarjeta').value;
+                const cvv = document.getElementById('cvvTarjeta').value;
+                if (!tarjeta || !exp || !cvv) {
+                    alert('Por favor completa los datos básicos de la tarjeta.');
+                    return;
+                }
+            }
+
+            const usuario = JSON.parse(localStorage.getItem('usuario'));
+            const total = carrito.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0);
+
+            const payload = {
+                idUsuario: usuario ? usuario.idUsuario : 1,
+                items: carrito,
+                total: total,
+                datosEnvio: { cedula, direccion, metodo }
+            };
+
+            try {
+                const res = await fetch('/api/ventas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`¡Compra realizada con éxito! Método de pago: ${metodo}. Tu pedido será enviado a: ${direccion}.`);
+                    cerrarModalPago();
+                    carrito = [];
+                    renderizarCarrito();
+                    cargarCatalogo();
+                } else {
+                    alert('Error en la compra: ' + data.error);
+                }
+            } catch (err) {
+                alert('Error de conexión al procesar la compra.');
+            }
+        });
+    </script>
+</body>
+</html>

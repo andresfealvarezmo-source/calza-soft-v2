@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel Administrador - Calza Soft</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <header>
+        <h1>Calza Soft - Panel de Administración</h1>
+        <button class="btn" style="background-color: var(--danger-color);" onclick="localStorage.clear(); window.location.href='/login.html';">Cerrar Sesión</button>
+    </header>
+    <div class="container">
+        <h2>Gestión Integral de Productos, Stock y Subida de Imágenes</h2>
+        <div class="dashboard-grid">
+            <div class="card" style="grid-column: span 2;">
+                <h3>Registrar Producto Masivo por Tallas (RF01)</h3>
+                <form id="productForm" style="margin-top: 1rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <input type="text" id="ref" placeholder="Referencia (ej. REF-BOOT-01)" required style="padding:0.5rem;">
+                        <input type="text" id="nombreProd" placeholder="Nombre del zapato" required style="padding:0.5rem;">
+                        <div style="grid-column: span 2;">
+                            <label style="font-weight:600; display:block; margin-bottom:0.3rem;">Imagen del Producto (Subir archivo):</label>
+                            <input type="file" id="imagenFile" accept="image/*" style="padding:0.3rem; width:100%; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px;" required>
+                        </div>
+                    </div>
+
+                    <div style="margin: 1rem 0; padding: 1rem; background: #f1f5f9; border-radius: 6px;">
+                        <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Selecciona las Tallas a Registrar (36 a 44):</label>
+                        <div id="tallasCheckboxContainer" style="display: flex; flex-wrap: wrap; gap: 10px;"></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <input type="number" id="precioMenor" placeholder="Precio al por menor" required style="padding:0.5rem;">
+                        <input type="number" id="precioMayor" placeholder="Precio al por mayor" required style="padding:0.5rem;">
+                        <input type="number" id="cantidadInicial" placeholder="Stock Inicial por Talla" required style="padding:0.5rem;">
+                    </div>
+
+                    <button type="submit" class="btn">Guardar Productos Masivamente</button>
+                </form>
+            </div>
+        </div>
+
+        <div style="margin-top: 2rem;">
+            <h3>Catálogo y Stock de Productos</h3>
+            <table id="tablaProductosAdmin">
+                <thead>
+                    <tr>
+                        <th>Imagen</th>
+                        <th>ID</th>
+                        <th>Referencia</th>
+                        <th>Nombre</th>
+                        <th>Talla</th>
+                        <th>P. Menor</th>
+                        <th>P. Mayor</th>
+                        <th>Stock</th>
+                        <th>Estado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            generarCheckboxesTallas();
+            cargarProductosAdmin();
+
+            document.getElementById('productForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const referencia = document.getElementById('ref').value;
+                const nombre = document.getElementById('nombreProd').value;
+                const imagenFile = document.getElementById('imagenFile').files[0];
+                const precioMenor = parseFloat(document.getElementById('precioMenor').value);
+                const precioMayor = parseFloat(document.getElementById('precioMayor').value);
+                const cantidadInicial = parseInt(document.getElementById('cantidadInicial').value);
+
+                const checkboxes = document.querySelectorAll('.talla-chk:checked');
+                if (checkboxes.length === 0) {
+                    alert('Debes seleccionar al menos una talla.');
+                    return;
+                }
+
+                let exito = true;
+                for (let chk of checkboxes) {
+                    const talla = chk.value;
+                    const formData = new FormData();
+                    formData.append('referencia', referencia);
+                    formData.append('nombre', nombre);
+                    formData.append('talla', talla);
+                    formData.append('precioMenor', precioMenor);
+                    formData.append('precioMayor', precioMayor);
+                    formData.append('cantidadInicial', cantidadInicial);
+                    if (imagenFile) {
+                        formData.append('imagen', imagenFile);
+                    }
+
+                    try {
+                        const res = await fetch('/api/productos', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        if (!res.ok) {
+                            const errData = await res.json();
+                            console.error("Error en talla " + talla + ":", errData.error);
+                            exito = false;
+                        }
+                    } catch (err) {
+                        console.error("Error de red:", err);
+                        exito = false;
+                    }
+                }
+
+                if (exito) {
+                    alert('¡Productos registrados exitosamente para todas las tallas seleccionadas!');
+                    document.getElementById('productForm').reset();
+                    generarCheckboxesTallas();
+                    cargarProductosAdmin();
+                } else {
+                    alert('Hubo un error al registrar algunas tallas. Revisa la consola (F12) para ver el detalle.');
+                }
+            });
+        });
+
+        function generarCheckboxesTallas() {
+            const container = document.getElementById('tallasCheckboxContainer');
+            container.innerHTML = '';
+            for (let t = 36; t <= 44; t++) {
+                container.innerHTML += `
+                    <label style="background: white; padding: 4px 8px; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer;">
+                        <input type="checkbox" class="talla-chk" value="${t}" checked> Talla ${t}
+                    </label>
+                `;
+            }
+        }
+
+        async function cargarProductosAdmin() {
+            try {
+                const res = await fetch('/api/productos');
+                const productos = await res.json();
+                const tbody = document.querySelector('#tablaProductosAdmin tbody');
+                tbody.innerHTML = '';
+
+                productos.forEach(p => {
+                    const imgUrl = p.imagen ? p.imagen : '/static/img/no-image.svg';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><img src="${imgUrl}" alt="Zapato" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" onerror="this.src='/static/img/no-image.svg'"></td>
+                        <td>${p.idProducto}</td>
+                        <td>${p.referencia}</td>
+                        <td>${p.nombre}</td>
+                        <td><strong>${p.talla}</strong></td>
+                        <td>$${p.precioMenor.toLocaleString()}</td>
+                        <td>$${p.precioMayor.toLocaleString()}</td>
+                        <td>${p.cantidad}</td>
+                        <td><span class="${p.cantidad === 0 ? 'badge-agotado' : 'badge-disponible'}">${p.cantidad === 0 ? 'Agotado' : 'Disponible'}</span></td>
+                        <td>
+                            <button class="btn" style="background-color: var(--danger-color); padding: 0.3rem 0.6rem; font-size: 0.85rem;" onclick="eliminarProducto(${p.idProducto})">Eliminar</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function eliminarProducto(id) {
+            if (!confirm('¿Estás seguro de eliminar este producto?')) return;
+            const res = await fetch(`/api/productos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            if (res.ok) {
+                alert('Producto eliminado correctamente.');
+                cargarProductosAdmin();
+            } else {
+                alert('Error al eliminar el producto.');
+            }
+        }
+    </script>
+</body>
+</html>

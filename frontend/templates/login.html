@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso - Calza Soft</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body style="justify-content: center; align-items: center; min-height: 100vh; background-color: var(--bg-color); display: flex;">
+    <div class="card" style="width: 100%; max-width: 420px;">
+        <h2 id="tituloForm" style="margin-bottom: 1.5rem; text-align: center; color: var(--primary-color);">Calza Soft - Iniciar Sesión</h2>
+        
+        <!-- FORMULARIO DE LOGIN -->
+        <form id="loginForm">
+            <div style="margin-bottom: 1rem;">
+                <label style="display:block; margin-bottom: 0.5rem;">Correo Electrónico:</label>
+                <input type="email" id="correoLogin" required style="width: 100%; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display:block; margin-bottom: 0.5rem;">Contraseña:</label>
+                <input type="password" id="contrasenaLogin" required style="width: 100%; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <button type="submit" class="btn" style="width: 100%;">Ingresar al Sistema</button>
+            <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem;">
+                ¿Eres cliente nuevo? <a href="#" onclick="alternarFormulario('registro')" style="color: var(--secondary-color); font-weight: bold;">Regístrate aquí</a>
+            </p>
+        </form>
+
+        <!-- FORMULARIO DE REGISTRO CLIENTE -->
+        <form id="registroForm" style="display: none;">
+            <div style="margin-bottom: 0.8rem;">
+                <label style="display:block; margin-bottom: 0.3rem;">Nombre Completo:</label>
+                <input type="text" id="nombreReg" required style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 0.8rem;">
+                <label style="display:block; margin-bottom: 0.3rem;">Número de Cédula:</label>
+                <input type="text" id="cedulaReg" required style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 0.8rem;">
+                <label style="display:block; margin-bottom: 0.3rem;">Correo Electrónico:</label>
+                <input type="email" id="correoReg" required style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 0.8rem;">
+                <label style="display:block; margin-bottom: 0.3rem;">Contraseña:</label>
+                <input type="password" id="contrasenaReg" required style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 1.2rem;">
+                <label style="display:block; margin-bottom: 0.3rem;">Dirección de Casa:</label>
+                <input type="text" id="direccionReg" required style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <button type="submit" class="btn" style="width: 100%; background-color: var(--success-color);">Registrarse como Cliente</button>
+            <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem;">
+                ¿Ya tienes cuenta? <a href="#" onclick="alternarFormulario('login')" style="color: var(--secondary-color); font-weight: bold;">Inicia sesión</a>
+            </p>
+        </form>
+
+        <p id="errorMsg" style="color: var(--danger-color); margin-top: 1rem; text-align: center;"></p>
+    </div>
+
+    <script>
+        function alternarFormulario(tipo) {
+            document.getElementById('errorMsg').textContent = '';
+            if (tipo === 'registro') {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('registroForm').style.display = 'block';
+                document.getElementById('tituloForm').textContent = 'Registro de Cliente - Calza Soft';
+            } else {
+                document.getElementById('loginForm').style.display = 'block';
+                document.getElementById('registroForm').style.display = 'none';
+                document.getElementById('tituloForm').textContent = 'Calza Soft - Iniciar Sesión';
+            }
+        }
+
+        // Manejar Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const correo = document.getElementById('correoLogin').value;
+            const contrasena = document.getElementById('contrasenaLogin').value;
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ correo, contrasena })
+                });
+
+                const contentType = response.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) throw new Error('La API no devolvió JSON (HTTP ' + response.status + ')');
+                const data = await response.json();
+                if (response.ok) {
+                    localStorage.setItem('usuario', JSON.stringify(data.usuario));
+                    if (data.usuario.rol === 'Administrador') {
+                        window.location.href = '/admin_dashboard.html';
+                    } else if (data.usuario.rol === 'Vendedor') {
+                        window.location.href = '/vendedor_dashboard.html';
+                    } else {
+                        window.location.href = '/cliente_dashboard.html';
+                    }
+                } else {
+                    document.getElementById('errorMsg').textContent = data.error || 'No se pudo completar la solicitud.';
+                }
+            } catch (err) {
+                console.error('Error de login:', err);
+                document.getElementById('errorMsg').textContent = 'No se pudo iniciar sesión. Comprueba la conexión y la consola del navegador.';
+            }
+        });
+
+        // Manejar Registro de Cliente
+        document.getElementById('registroForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nombre = document.getElementById('nombreReg').value;
+            const cedula = document.getElementById('cedulaReg').value;
+            const correo = document.getElementById('correoReg').value;
+            const contrasena = document.getElementById('contrasenaReg').value;
+            const direccion = document.getElementById('direccionReg').value;
+
+            try {
+                const response = await fetch('/api/auth/registro', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, cedula, correo, contrasena, direccion })
+                });
+
+                const contentType = response.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) throw new Error('La API no devolvió JSON (HTTP ' + response.status + ')');
+                const data = await response.json();
+                if (response.ok) {
+                    alert('¡Registro exitoso! Ahora inicia sesión con tus datos.');
+                    alternarFormulario('login');
+                } else {
+                    document.getElementById('errorMsg').textContent = data.error || 'No se pudo completar la solicitud.';
+                }
+            } catch (err) {
+                document.getElementById('errorMsg').textContent = 'Error de conexión al registrar.';
+            }
+        });
+    </script>
+</body>
+</html>
